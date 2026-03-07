@@ -45,6 +45,7 @@ DATA = {
     "hokimlik": {
         "title": "🏛 Tuman hokimligi",
         "items": [
+            {"name": "Туман ҳокими — Исмоилов Химматилло", "phone": ["91-101-00-11"]},
             {"name": "Биринчи ўринбосар — Абдужабборов Акромжон", "phone": ["97-272-77-22"]},
             {"name": "Қурилиш бўйича ўринбосар — Ахмедов Анваржон", "phone": ["88-992-10-00"]},
             {"name": "Инвестиция бўйича ўринбосар — Содиқов Дилёрбек", "phone": ["94-566-78-18"]},
@@ -698,9 +699,9 @@ async def on_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text("Туман ташкилотлари рўйхати 👇", reply_markup=list_items_kb(DATA["tashkilotlar"]["items"]))
         return
 
-    if txt == "🎓 maktab":
+    if txt == "🎓 Maktab":
         context.user_data[KEY_LEVEL] = LV_TALIM
-        await update.message.reply_text("maktab muassasalari рўйхати 👇", reply_markup=list_items_kb(DATA["talim"]["items"]))
+        await update.message.reply_text("Maktab muassasalari рўйхати 👇", reply_markup=list_items_kb(DATA["Maktab"]["items"]))
         return
 
     if txt == "🏫 Bog'cha":
@@ -730,7 +731,7 @@ async def on_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
         key = {
             LV_HOK: "hokimlik",
             LV_TASH: "tashkilotlar",
-            LV_TALIM: "maktab",
+            LV_TALIM: "Maktab",
             LV_BOGCHA: "bogcha",
         }[lvl]
 
