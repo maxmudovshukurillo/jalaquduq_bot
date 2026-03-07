@@ -798,6 +798,10 @@ async def create_telegram_application():
     application.add_handler(CommandHandler("start", start))
     application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, on_text))
     
+    # Muhim: Webhook rejimida qo'lda initialize qilish kerak
+    await application.initialize()
+    await application.start()
+    
     return application
 
 @flask_app.route('/')
