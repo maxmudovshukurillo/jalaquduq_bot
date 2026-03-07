@@ -1,5 +1,5 @@
 python-telegram-bot
-flask
+flask[async]
 python-dotenv
 httpx
 gunicorn

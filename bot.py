@@ -816,6 +816,9 @@ async def webhook_handler():
         await telegram_application.process_update(update)
     return "OK"
 
+# Render gunicorn uchun qulaylik
+app = flask_app
+
 telegram_application = None
 
 def run():
