@@ -1,9 +1,10 @@
 services:
   - type: web
-    name: jalaquduq-bot
+    name: jalaquduq-bot-new
     env: python
     buildCommand: pip install -r requirements.txt
     startCommand: python bot.py
+    healthCheckPath: /
     envVars:
       - key: BOT_TOKEN
         sync: false

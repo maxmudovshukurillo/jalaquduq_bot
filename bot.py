@@ -24,18 +24,15 @@ def normalize_uz_phone(raw: str) -> str:
         return "+998" + digits
     if len(digits) == 12 and digits.startswith("998"):
         return "+" + digits
-    # agar foydalanuvchi allaqachon +998... yozgan bo‘lsa
     if (raw or "").strip().startswith("+"):
         return (raw or "").strip()
     return (raw or "").strip()
-
 
 def format_phones(phones) -> str:
     if isinstance(phones, str):
         phones = [phones]
     phones = [normalize_uz_phone(p) for p in phones if (p or "").strip()]
     return ", ".join(phones) if phones else "Телефон кўрсатилмаган"
-
 
 # ================== DATA ==================
 # Har bir bo‘lim: {"title": "...", "items":[{"name":"..","phone":[...]}]}
@@ -611,33 +608,28 @@ DATA = {
 def kb_rows_from_texts(texts: list[str], prefix_data: str, per_row: int = 2) -> list[list[InlineKeyboardButton]]:
     rows, row = [], []
     for t in texts:
-        # Extract the short name (before ' — ') for display, but keep the full name or short name in callback data
-        # Callback data length limit is 64 bytes, so we use a safe ID or shortened text.
         short_name = t.split(" — ")[0]
-        # To avoid callback_data too long errors, truncate if necessary
         cb_data = f"{prefix_data}:{short_name}"[:64]
         row.append(InlineKeyboardButton(short_name, callback_data=cb_data))
         if len(row) == per_row:
             rows.append(row)
             row = []
-    if row:
-        rows.append(row)
+    if row: rows.append(row)
     return rows
 
 def main_menu_kb() -> InlineKeyboardMarkup:
-    rows = [
+    return InlineKeyboardMarkup([
         [InlineKeyboardButton("🏛 Туман ҳокимлиги", callback_data="menu:hokimlik"), 
          InlineKeyboardButton("🏢 Туман ташкилотлари", callback_data="menu:tashkilotlar")],
         [InlineKeyboardButton("🎓 Мактаблар", callback_data="menu:maktab"), 
          InlineKeyboardButton("🏫 Боғчалар", callback_data="menu:bogcha")],
         [InlineKeyboardButton("🏘 МФЙлар", callback_data="menu:mfy_list")],
         [InlineKeyboardButton("ℹ️ Йўриқнома", callback_data="menu:help")],
-    ]
-    return InlineKeyboardMarkup(rows)
+    ])
 
 def list_items_kb(items: list[dict], category: str) -> InlineKeyboardMarkup:
     names = [it["name"] for it in items]
-    rows = kb_rows_from_texts(names, f"item:{category}", per_row=2)
+    rows = kb_rows_from_texts(names, f"item:{category}")
     rows.append([InlineKeyboardButton("🔙 Орқага", callback_data="nav:main")])
     return InlineKeyboardMarkup(rows)
 
@@ -654,7 +646,7 @@ def list_mfy_roles_kb(roles: list[dict], mfy_name: str) -> InlineKeyboardMarkup:
 
 # ================== HANDLERS ==================
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    msg = "Ассалому алайкум!\n\nЖалақудуқ тумани ташкилотлари, мактаб, боғча ва МФЙларининг маълумотлар базасига хуш келибсиз.\nҚуйидаги менюдан керакли бўлимни танланг 👇"
+    msg = "Ассалому алайкум!\n\nЖалақудуқ тумани маълумотлар базасига хуш келибсиз.\nҚуйидаги менюдан керакли бўлимни танланг 👇"
     
     if update.message:
         await update.message.reply_text(msg, reply_markup=main_menu_kb())
@@ -668,137 +660,83 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     logger.info("CALLBACK: %s", data)
 
-    # ====== NAVIGATION ======
+    # Navigatsiya
     if data == "nav:main":
         await start(update, context)
         return
-    
     if data == "nav:mfy_list":
         mahallas = list(DATA["mfy"]["mahallas"].keys())
         await query.message.edit_text("🏘 МФЙлар рўйхати 👇", reply_markup=list_mahalla_kb(mahallas))
         return
 
-    # ====== MAIN MENU ======
+    # Asosiy menyu
     if data.startswith("menu:"):
         choice = data.split(":")[1]
-        
         if choice in ["hokimlik", "tashkilotlar", "maktab", "bogcha"]:
             items = DATA[choice]["items"]
             title = DATA[choice]["title"]
             await query.message.edit_text(f"{title} рўйхати 👇", reply_markup=list_items_kb(items, choice))
-            return
-            
-        if choice == "mfy_list":
+        elif choice == "mfy_list":
             mahallas = list(DATA["mfy"]["mahallas"].keys())
             await query.message.edit_text("🏘 МФЙлар рўйхати 👇", reply_markup=list_mahalla_kb(mahallas))
-            return
-            
-        if choice == "help":
+        elif choice == "help":
             await query.message.edit_text(
-                "ℹ️ Йўриқнома:\n\n"
-                "1) Тугмалар орқали керакли бўлимни танланг.\n"
-                "2) Қидираётган ташкилотингиз ёки МФЙ номини босинг.\n"
-                "3) Керакли масъул шахснинг телефони ва исми-шарифи экранда пайдо бўлади.\n\n"
-                "🔙 'Орқага' тугмаси орқали олдинги менуга қайтишингиз мумкин.",
+                "ℹ️ Йўриқнома:\n1) Бўлимни танланг.\n2) Керакli ташкилотни босинг.\n3) Маълумот чиқади.\n\n🔙 'Орқага' орқали қайтасиз.",
                 reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 Орқага", callback_data="nav:main")]])
             )
-            return
 
-    # ====== LISTS SELECTION (HOKIMLIK/TASHKILOT/TALIM/BOGCHA) ======
-    if data.startswith("item:"):
+    # Tashkilot/Maktab tanlash
+    elif data.startswith("item:"):
         parts = data.split(":", 2)
-        if len(parts) == 3:
-            category = parts[1]
-            short_name = parts[2]
-            
-            items = DATA[category]["items"]
-            # Find the match using the short_name
-            item = next((x for x in items if x["name"].split(" — ")[0] == short_name), None)
-            
+        cat, short = parts[1], parts[2]
+        items = DATA[cat]["items"]
+        item = next((x for x in items if x["name"].split(" — ")[0] == short), None)
+        if item:
+            icon = DATA[cat]["title"].split(" ")[0]
+            text = f"{icon} <b>{item['name']}</b>\n📞 Телефон: {format_phones(item['phone'])}"
+            await query.message.edit_text(text, parse_mode='HTML', reply_markup=list_items_kb(items, cat))
+
+    # MFY tanlash
+    elif data.startswith("mfy:"):
+        mfy_name = data.split(":", 1)[1]
+        matched = next((m for m in DATA["mfy"]["mahallas"] if m.startswith(mfy_name)), None)
+        if matched:
+            roles = DATA["mfy"]["mahallas"][matched]
+            await query.message.edit_text(f"🏘 <b>{matched}</b>\nЛавозимни танланг 👇", parse_mode='HTML', reply_markup=list_mfy_roles_kb(roles, matched))
+
+    # MFY lavozim tanlash
+    elif data.startswith("role:"):
+        parts = data.split(":", 2)
+        mfy_n, role_s = parts[1], parts[2]
+        if mfy_n in DATA["mfy"]["mahallas"]:
+            roles = DATA["mfy"]["mahallas"][mfy_n]
+            item = next((x for x in roles if x["name"].split(" — ")[0] == role_s), None)
             if item:
-                icon = DATA[category]["title"].split(" ")[0]
-                
-                text_content = f"{icon} <b>{item['name']}</b>\n📞 Телефон: {format_phones(item['phone'])}"
-                
-                await query.message.edit_text(
-                    text_content,
-                    parse_mode='HTML',
-                    reply_markup=list_items_kb(items, category)
-                )
-            return
-
-    # ====== MFY SELECTION ======
-    if data.startswith("mfy:"):
-        parts = data.split(":", 1)
-        if len(parts) == 2:
-            mfy_name = parts[1]
-            
-            # Reconstruct original name if truncated
-            matched_name = next((m for m in DATA["mfy"]["mahallas"] if m.startswith(mfy_name)), None)
-            
-            if matched_name:
-                roles = DATA["mfy"]["mahallas"][matched_name]
-                await query.message.edit_text(f"🏘 <b>{matched_name}</b>\n\nЛавозимни танланг 👇", parse_mode='HTML', reply_markup=list_mfy_roles_kb(roles, matched_name))
-            return
-
-    # ====== MFY ROLES SELECTION ======
-    if data.startswith("role:"):
-        parts = data.split(":", 2)
-        if len(parts) == 3:
-            mfy_name = parts[1]
-            short_role_name = parts[2]
-            
-            if mfy_name in DATA["mfy"]["mahallas"]:
-                roles = DATA["mfy"]["mahallas"][mfy_name]
-                item = next((x for x in roles if x["name"].split(" — ")[0] == short_role_name), None)
-                
-                if item:
-                    text_content = f"🏘 <b>{mfy_name}</b>\n👤 {item['name']}\n📞 Телефон: {format_phones(item['phone'])}"
-                    await query.message.edit_text(
-                        text_content,
-                        parse_mode='HTML',
-                        reply_markup=list_mfy_roles_kb(roles, mfy_name)
-                    )
-                return
-
+                text = f"🏘 <b>{mfy_n}</b>\n👤 {item['name']}\n📞 Телефон: {format_phones(item['phone'])}"
+                await query.message.edit_text(text, parse_mode='HTML', reply_markup=list_mfy_roles_kb(roles, mfy_n))
 
 # ================== RUN ==================
 def run():
     token = os.getenv("BOT_TOKEN", "").strip()
     if not token:
-        raise RuntimeError("BOT_TOKEN topilmadi. .env faylga BOT_TOKEN=... qilib yozing!")
+        raise RuntimeError("BOT_TOKEN topilmadi!")
 
     socket.setdefaulttimeout(30)
-
-    request = HTTPXRequest(
-        connect_timeout=30.0,
-        read_timeout=30.0,
-        write_timeout=30.0,
-        pool_timeout=30.0,
-        http_version="1.1",
-    )
-
+    request = HTTPXRequest(connect_timeout=30.0, read_timeout=30.0, write_timeout=30.0, pool_timeout=30.0, http_version="1.1")
     app = Application.builder().token(token).request(request).build()
+    
     app.add_handler(CommandHandler("start", start))
     app.add_handler(CallbackQueryHandler(button_handler))
 
-    # Webhook sozlash
     port = int(os.environ.get("PORT", 8443))
     render_url = os.environ.get("RENDER_EXTERNAL_URL", "")
 
     if render_url:
-        # Agar Renderda ishlayotgan bo'lsa webhook yoqadi
-        logger.info(f"Bot webhook orqali ishga tushirildi: {render_url}")
-        app.run_webhook(
-            listen="0.0.0.0",
-            port=port,
-            webhook_url=f"{render_url}"
-        )
+        logger.info(f"Webhook: {render_url}")
+        app.run_webhook(listen="0.0.0.0", port=port, webhook_url=render_url)
     else:
-        # Mahalliy kompyuterda ishlayotganda
-        logger.info("Bot lokal polling orqali ishga tushdi ✅")
+        logger.info("Polling ✅")
         app.run_polling(drop_pending_updates=True)
-
 
 if __name__ == "__main__":
     run()
