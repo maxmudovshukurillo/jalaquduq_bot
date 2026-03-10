@@ -8,9 +8,6 @@ from telegram import Update, InlineKeyboardMarkup, InlineKeyboardButton
 from telegram.ext import Application, CommandHandler, CallbackQueryHandler, ContextTypes
 from telegram.request import HTTPXRequest
 
-import threading
-from flask import Flask
-
 # ================== LOG ==================
 logging.basicConfig(
     format="%(asctime)s | %(levelname)s | %(name)s | %(message)s",
@@ -610,17 +607,6 @@ DATA = {
     },
 }
 
-# ================== FLASK KEEP-ALIVE ==================
-flask_app = Flask(__name__)
-
-@flask_app.route('/')
-def home():
-    return "Jalaquduq Bot is alive and running!"
-
-def run_flask():
-    port = int(os.environ.get("PORT", 8080))
-    flask_app.run(host="0.0.0.0", port=port)
-
 # ================== HELPERS ==================
 def kb_rows_from_texts(texts: list[str], prefix_data: str, per_row: int = 2) -> list[list[InlineKeyboardButton]]:
     rows, row = [], []
@@ -796,14 +782,22 @@ def run():
     app.add_handler(CommandHandler("start", start))
     app.add_handler(CallbackQueryHandler(button_handler))
 
-    logger.info("Bot ishga tushdi ✅")
-    
-    # Run the Flask app in a separate thread so it doesn't block the bot
-    flask_thread = threading.Thread(target=run_flask)
-    flask_thread.daemon = True
-    flask_thread.start()
-    
-    app.run_polling(drop_pending_updates=True)
+    # Webhook sozlash
+    port = int(os.environ.get("PORT", 8443))
+    render_url = os.environ.get("RENDER_EXTERNAL_URL", "")
+
+    if render_url:
+        # Agar Renderda ishlayotgan bo'lsa webhook yoqadi
+        logger.info(f"Bot webhook orqali ishga tushirildi: {render_url}")
+        app.run_webhook(
+            listen="0.0.0.0",
+            port=port,
+            webhook_url=f"{render_url}"
+        )
+    else:
+        # Mahalliy kompyuterda ishlayotganda
+        logger.info("Bot lokal polling orqali ishga tushdi ✅")
+        app.run_polling(drop_pending_updates=True)
 
 
 if __name__ == "__main__":
