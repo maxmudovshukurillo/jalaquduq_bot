@@ -1,6 +1,7 @@
 import os
 import re
 import asyncio
+import threading
 import socket
 import logging
 from aiohttp import web
@@ -800,7 +801,22 @@ async def health(_: web.Request) -> web.Response:
     return web.Response(text="ok")
 
 
-async def main():
+def start_health_server():
+    async def _run():
+        web_app = web.Application()
+        web_app.router.add_get("/", health)
+        runner = web.AppRunner(web_app)
+        await runner.setup()
+        site = web.TCPSite(runner, "0.0.0.0", int(os.getenv("PORT", "8000")))
+        await site.start()
+        logger.info("Health server listening on 0.0.0.0:%s", os.getenv("PORT", "8000"))
+        while True:
+            await asyncio.sleep(3600)
+
+    threading.Thread(target=lambda: asyncio.run(_run()), daemon=True).start()
+
+
+def main():
     token = os.getenv("BOT_TOKEN", "").strip()
     if not token:
         raise RuntimeError("BOT_TOKEN topilmadi. .env faylga BOT_TOKEN=... qilib yozing!")
@@ -819,21 +835,10 @@ async def main():
     app.add_handler(CommandHandler("start", start))
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, on_text))
 
-    # Health endpoint for uptime pinger
-    port = int(os.getenv("PORT", "8000"))
-    web_app = web.Application()
-    web_app.router.add_get("/", health)
-    runner = web.AppRunner(web_app)
-    await runner.setup()
-    site = web.TCPSite(runner, "0.0.0.0", port)
-    await site.start()
-    logger.info("Health server listening on 0.0.0.0:%s", port)
-
-    try:
-        await app.run_polling(drop_pending_updates=True, allowed_updates=Update.ALL_TYPES)
-    finally:
-        await runner.cleanup()
+    start_health_server()
+    logger.info("Bot ishga tushdi ✅")
+    app.run_polling(drop_pending_updates=True, allowed_updates=Update.ALL_TYPES)
 
 
 if __name__ == "__main__":
-    asyncio.run(main())
+    main()
