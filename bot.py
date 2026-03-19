@@ -815,9 +815,9 @@ async def main():
         http_version="1.1",
     )
 
-    bot_app = Application.builder().token(token).request(request).build()
-    bot_app.add_handler(CommandHandler("start", start))
-    bot_app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, on_text))
+    app = Application.builder().token(token).request(request).build()
+    app.add_handler(CommandHandler("start", start))
+    app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, on_text))
 
     # Health endpoint for uptime pinger
     port = int(os.getenv("PORT", "8000"))
@@ -829,19 +829,10 @@ async def main():
     await site.start()
     logger.info("Health server listening on 0.0.0.0:%s", port)
 
-    # Start bot polling
-    await bot_app.initialize()
-    await bot_app.start()
-    await bot_app.updater.start_polling(drop_pending_updates=True)
-    logger.info("Bot ishga tushdi ✅")
-
-    # Wait until bot stops (Ctrl+C)
-    await bot_app.updater.wait()
-
-    # Cleanup
-    await bot_app.stop()
-    await bot_app.shutdown()
-    await runner.cleanup()
+    try:
+        await app.run_polling(drop_pending_updates=True, allowed_updates=Update.ALL_TYPES)
+    finally:
+        await runner.cleanup()
 
 
 if __name__ == "__main__":

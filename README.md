@@ -11,8 +11,8 @@ BOT_TOKEN=your_token_here python bot.py
 
 ## Render
 - Add env var BOT_TOKEN.
-- Python version: set untime.txt to python-3.12.7 (Render reads it automatically).
+- Python version pinned via untime.txt (python-3.12.7).
 - Start command: python bot.py.
-- No build command needed.
+- Build command: leave empty.
 - Uptime ping: https://<your-app>.onrender.com/
 
